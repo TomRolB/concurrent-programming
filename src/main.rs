@@ -1,33 +1,44 @@
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
 
     for stream in listener.incoming() {
-        let stream = stream.unwrap();
+        let mut stream = stream.unwrap();
 
-        let mut buf_reader = BufReader::new(stream);
+        let mut buf_reader = BufReader::new(&stream);
         let optional_line = buf_reader.lines()
-            .find(|result| result.as_ref().unwrap().starts_with("GET /api/"));
+            .map(|result| result.unwrap())
+            .find(|line| line.starts_with("GET /api/"));
 
-        match optional_line {
-            None => { println!("Invalid request"); }
-            Some(Err(_)) => { println!("Invalid request"); }
-            Some(Ok(line)) => {
-                parse_path(line);
+        let digit_position_or_error = parse_path(optional_line);
+
+        let response = match digit_position_or_error {
+            Err(error_message) => get_response(400, error_message),
+            Ok(digit_position) => {
+                get_response(200, calculate_digits(digit_position).to_string())
             }
+        };
+
+        stream.write_all(response.as_bytes()).unwrap();    }
+}
+
+fn get_response(code: u16, body: String) -> String {
+    format!("HTTP/1.1 {} \r\n\r\n{}", code, body)
+}
+
+fn parse_path(optional_line: Option<String>) -> Result<u16, String> {
+    match optional_line {
+        None => { Err("Invalid request".to_string()) }
+        Some(line) => {
+            let path = line.split(" ").collect::<Vec<&str>>()[1];
+            let num_as_string = path.split("/").collect::<Vec<&str>>()[2];
+
+            str::parse::<u16>(num_as_string).or_else(|_| Err("Parse error".to_string()) )
         }
     }
 }
 
-fn parse_path(line_posta: String) {
-    let path = line_posta.split(" ").collect::<Vec<&str>>()[1];
-    let num_as_string = path.split("/").collect::<Vec<&str>>()[2];
-
-    match str::parse::<u16>(num_as_string) {
-        Err(err_message) => println!("{}", err_message),
-        Ok(parsed_num) => println!("{}", parsed_num)
-    }
-}
+fn calculate_digits(digit_position: u16) -> u8 { 1 }
 
