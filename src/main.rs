@@ -11,11 +11,15 @@ fn main() {
     for stream in listener.incoming() {
         let mut stream = stream.unwrap();
 
+        // TODO: code below could be moved to a parsing module, which exclusively parses
+        //  a request and returns different types of errors (use an enum) plus the success case.
         let buf_reader = BufReader::new(&stream);
         let optional_line = buf_reader.lines()
             .map(|result| result.unwrap())
             .find(|line| line.starts_with("GET /api/"));
 
+        // TODO: code below could be moved to an error-handling module, which takes a Result
+        //  and returns an error message (string) and an HTTP code based on the error type.
         let digit_position_or_error = parse_path(optional_line);
 
         let response = match digit_position_or_error {
@@ -42,6 +46,7 @@ fn get_response(code: u16, body: String) -> String {
     format!("HTTP/1.1 {} \r\n\r\n{}", code, body)
 }
 
+//TODO: move to parsing module described above.
 fn parse_path(optional_line: Option<String>) -> Result<u32, String> {
     match optional_line {
         None => { Err("Invalid request".to_string()) }
@@ -54,6 +59,7 @@ fn parse_path(optional_line: Option<String>) -> Result<u32, String> {
     }
 }
 
+//TODO: should be somewhere else. A "core" module? Isn't the core the server per se?
 fn calculate_digits(digit_position: u32) -> f64 {
     (0..=digit_position)
         .map(|n| (-1i32).pow(n) as f64 / (2.0 * (n as f64) + 1.0))
