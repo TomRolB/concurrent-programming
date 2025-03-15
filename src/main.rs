@@ -1,13 +1,17 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 
+mod utils;
+use utils::time::execute_and_time;
+use crate::utils::time::Timed;
+
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
 
     for stream in listener.incoming() {
         let mut stream = stream.unwrap();
 
-        let mut buf_reader = BufReader::new(&stream);
+        let buf_reader = BufReader::new(&stream);
         let optional_line = buf_reader.lines()
             .map(|result| result.unwrap())
             .find(|line| line.starts_with("GET /api/"));
@@ -17,7 +21,16 @@ fn main() {
         let response = match digit_position_or_error {
             Err(error_message) => get_response(400, error_message),
             Ok(digit_position) => {
-                get_response(200, calculate_digits(digit_position).to_string())
+                let Timed { duration, result } =
+                    execute_and_time(|| calculate_digits(digit_position));
+                let response_message = format!(
+                    "Value of Pi for the term {}: {} (time: {}s)",
+                    digit_position,
+                    result,
+                    duration.as_secs_f32()
+                );
+
+                get_response(200, response_message)
             }
         };
 
