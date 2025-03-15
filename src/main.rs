@@ -2,8 +2,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 
 mod utils;
-use utils::time::execute_and_time;
-use crate::utils::time::Timed;
+use utils::{time, request};
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
@@ -25,8 +24,8 @@ fn main() {
         let response = match digit_position_or_error {
             Err(error_message) => get_response(400, error_message),
             Ok(digit_position) => {
-                let Timed { duration, result } =
-                    execute_and_time(|| calculate_digits(digit_position));
+                let time::Timed { duration, result } =
+                    time::execute_and_time(|| calculate_digits(digit_position));
                 let response_message = format!(
                     "Value of Pi for the term {}: {} (time: {}s)",
                     digit_position,
@@ -39,7 +38,8 @@ fn main() {
         };
 
         println!("{}", response);
-        stream.write_all(response.as_bytes()).unwrap();    }
+        stream.write_all(response.as_bytes()).unwrap();    
+    }
 }
 
 fn get_response(code: u16, body: String) -> String {
