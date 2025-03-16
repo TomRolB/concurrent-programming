@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::net::TcpStream;
 use std::io::{BufRead, BufReader};
-use crate::utils::request::ParseError::UnknownMethod;
+use ParseError::UnknownMethod;
 
 pub enum RequestMethod {
     GET,
@@ -30,7 +30,7 @@ pub fn parse(stream: &TcpStream) -> Result<Request, ParseError> {
     let buf_reader = BufReader::new(stream);
     let lines: Vec<String> = buf_reader.lines()
         .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty()) // request body comes after first empty line
+        .take_while(|line| !line.is_empty()) // server body comes after first empty line
         .collect();
 
     let method_uri_version: Vec<&str> = lines[0].split(" ").collect();
@@ -57,3 +57,9 @@ pub fn parse(stream: &TcpStream) -> Result<Request, ParseError> {
     })
 }
 
+pub fn parse_uri(uri: String) -> Result<u32, String> {
+    let num_as_string = uri.split("/").collect::<Vec<&str>>()[2];
+
+    str::parse::<u32>(num_as_string)
+        .or_else(|_| Err( format!("'{}' is not a number", num_as_string)))
+}
