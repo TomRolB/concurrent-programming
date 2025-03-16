@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::net::TcpStream;
 use std::io::{BufRead, BufReader};
+use crate::utils::request::ParseError::UnknownMethod;
 
 pub enum RequestMethod {
     GET,
@@ -21,7 +22,11 @@ pub struct Request {
     pub body: String
 }
 
-pub fn parse(stream: &TcpStream) -> Result<Request, String> {
+pub enum ParseError {
+    UnknownMethod(String)
+}
+
+pub fn parse(stream: &TcpStream) -> Result<Request, ParseError> {
     let buf_reader = BufReader::new(stream);
     let lines: Vec<String> = buf_reader.lines()
         .map(|result| result.unwrap())
@@ -39,7 +44,7 @@ pub fn parse(stream: &TcpStream) -> Result<Request, String> {
         "OPTIONS" => Ok(RequestMethod::OPTIONS),
         "TRACE" => Ok(RequestMethod::TRACE),
         "PATCH" => Ok(RequestMethod::PATCH),
-        _ => Err(format!("Invalid request method: {}", method_uri_version[0]))
+        _ => Err(UnknownMethod(method_uri_version[0].to_string()))
     }?;
 
     let uri = method_uri_version[1];
