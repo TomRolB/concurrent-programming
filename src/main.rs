@@ -29,7 +29,7 @@ fn handle_request(stream: &mut TcpStream) -> String {
         }
     };
 
-    let term = match server::request::parse_uri(uri) {
+    let term = match server::request::get_param(uri) {
         Ok(digit_position) => { digit_position }
         Err(message) => { return get_response(400, message) }
     };
