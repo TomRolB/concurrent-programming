@@ -58,8 +58,11 @@ pub fn parse(stream: &TcpStream) -> Result<Request, ParseError> {
 }
 
 pub fn get_param(uri: String) -> Result<u32, String> {
-    let num_as_string = uri.split("/").collect::<Vec<&str>>()[2];
-
+    let num_as_string = match uri.split("/").collect::<Vec<&str>>().last() {
+        Some(num) => num,
+        None => "",
+    };
+    
     str::parse::<u32>(num_as_string)
         .or_else(|_| Err( format!("'{}' is not a number", num_as_string)))
 }
