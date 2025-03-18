@@ -3,6 +3,7 @@ use std::net::TcpStream;
 use std::io::{BufRead, BufReader};
 use ParseError::UnknownMethod;
 
+#[derive(PartialEq, Eq)]
 pub enum RequestMethod {
     GET,
     HEAD,

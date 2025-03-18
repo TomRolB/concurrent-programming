@@ -5,7 +5,7 @@ mod utils;
 mod core;
 mod server;
 
-use server::request::ParseError;
+use server::request::{ParseError, RequestMethod};
 use utils::time;
 use crate::core::math;
 
@@ -22,18 +22,18 @@ fn main() {
 }
 
 fn handle_request(stream: &mut TcpStream) -> String {
-    let uri: String = match server::request::parse(&stream) {
-        Ok(request) => { request.uri }
+    let request = match server::request::parse(&stream) {
+        Ok(request) => request,
         Err(ParseError::UnknownMethod(method)) => {
             return get_response(501, format!("Unknown method: {}", method));
         }
     };
 
-    if !uri.starts_with("/pi/") {
+    if request.method != RequestMethod::GET || !request.uri.starts_with("/pi/") {
         return get_response(404, "The requested URL does not exist on the server".to_string());
     }
 
-    let term = match server::request::get_param(uri) {
+    let term = match server::request::get_param(request.uri) {
         Ok(digit_position) => { digit_position }
         Err(message) => { return get_response(400, message) }
     };
