@@ -1,4 +1,4 @@
-use std::io::{Write};
+use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 
 mod utils;
