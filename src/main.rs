@@ -29,6 +29,10 @@ fn handle_request(stream: &mut TcpStream) -> String {
         }
     };
 
+    if !uri.starts_with("/pi/") {
+        return get_response(404, "The requested URL does not exist on the server".to_string());
+    }
+
     let term = match server::request::get_param(uri) {
         Ok(digit_position) => { digit_position }
         Err(message) => { return get_response(400, message) }
@@ -47,5 +51,5 @@ fn handle_request(stream: &mut TcpStream) -> String {
 }
 
 fn get_response(code: u16, body: String) -> String {
-    format!("HTTP/1.1 {} \r\n\r\n{}", code, body)
+    format!("HTTP/1.1 {} \r\n\r\n{}\n", code, body)
 }
