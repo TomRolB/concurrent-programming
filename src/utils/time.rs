@@ -5,7 +5,7 @@ pub struct Timed<T> {
     pub result: T
 }
 
-pub fn execute_and_time<U>(function: impl Fn() -> U) -> Timed<U> {
+pub fn execute_and_time<U>(function: &mut impl FnMut() -> U) -> Timed<U> {
     let start = Instant::now();
     let result = function();
 
