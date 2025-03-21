@@ -3,7 +3,6 @@ use std::thread;
 use std::net::{TcpListener, TcpStream};
 use std::time::Instant;
 
-mod utils;
 mod core;
 mod server;
 
