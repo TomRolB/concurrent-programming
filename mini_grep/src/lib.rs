@@ -33,26 +33,6 @@ pub fn grep_conc(pattern: &String, files: Vec<File>) -> Vec<String> {
     })
 }
 
-// pub fn grep_chunk(pattern: &String, files: Vec<File>, chunk_size: usize) -> Vec<String> {
-//     thread::scope(|s| {
-//         let all_lines = files
-//             .iter()
-//             .map(|file| BufReader::new(file).lines().map(|line| line.unwrap()))
-//             .flatten();
-//
-//         let threads = chunked(all_lines, chunk_size).map(|chunk_iterator| {
-//             s.spawn(move || {
-//                 chunk_iterator.iter().filter(move |line| line.contains(pattern))
-//             })
-//         });
-//
-//         threads.map(|t| t.join().unwrap())
-//             .flatten()
-//             .map(|s| *s)
-//             .collect()
-//     })
-// }
-
 pub fn grep_chunk(pattern: &String, files: Vec<File>, chunk_size: usize) -> Vec<String> {
     thread::scope(|s| {
         let file_threads = files.iter().map(|file| {
