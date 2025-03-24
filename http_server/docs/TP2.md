@@ -115,3 +115,17 @@ Percentage of the requests served within a certain time (ms)
  100%   7590 (longest request)
 ```
 
+## Conclusión
+* Sin utilizar threads, una serie de requests tarda 10430.762ms, y en promedio cada request individual tarda 208.615ms.
+* Al utilizar threads, dicha serie de requests tarda 2279.634, y en promedio cada request individual tarda 45.593ms.
+
+Esto se debe a que, sin threads, las requests llegan y se "encolan". 
+Por tanto, la segunda request va a acumular la duración de la anterior y su propio cálculo de pi.
+La tercera lo mismo, pero acumulando el tiempo de la primera y la segunda, y así sucesivamente.
+
+Entonces, las últimas request añaden cierta ponderación al promedio que se toma de las requests individuales.
+En cambio, al utilizar threads se procesan requests en paralelo, por lo cual cada una toma una cantidad
+de tiempo similar, de manera que el promedio es menor.
+
+Por el lado del tiempo total, si en el primer caso el tiempo de las request se acumula pero en el segundo 
+hay duraciones parecidas, es de esperar que la suma total haya sido mayor sin paralelización.
