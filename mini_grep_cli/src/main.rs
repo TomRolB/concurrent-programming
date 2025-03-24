@@ -67,8 +67,8 @@ fn run() -> Result<(), CliErr> {
 
 fn get_chunk_size(args: &mut Args, mode: &String) -> Result<usize, CliErr> {
     if mode == "c-chunk" {
-        let chunks_as_str = args.next().ok_or(MissingChunkSize)?;
-        usize::from_str(chunks_as_str.as_str())
+        let chunks_as_string = args.next().ok_or(MissingChunkSize)?;
+        usize::from_str(chunks_as_string.as_str())
             .map_err(|_| ParseChunkSizeError)
     } else {
         Ok(0)
@@ -76,10 +76,12 @@ fn get_chunk_size(args: &mut Args, mode: &String) -> Result<usize, CliErr> {
 }
 
 fn get_remaining(args: &mut Args) -> Result<impl Iterator<Item = String>, CliErr> {
-    if let None = args.peekable().peek() {
+    let mut peekable_args = args.peekable();
+    if let None = peekable_args.peek() {
         return Err(MissingFiles);
     };
-    Ok(args)
+
+    Ok(peekable_args)
 }
 
 fn open_files(file_names: impl Iterator<Item = String>) -> Result<Vec<File>, CliErr> {
@@ -90,5 +92,6 @@ fn open_files(file_names: impl Iterator<Item = String>) -> Result<Vec<File>, Cli
 
 fn print_all(filtered_lines: Vec<String>) -> Result<(), CliErr> {
     filtered_lines.iter().for_each(|line| println!("{}", line));
+    println!("(Found {} matches)", filtered_lines.len());
     Ok(())
 }
