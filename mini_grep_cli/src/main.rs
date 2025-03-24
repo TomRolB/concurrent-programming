@@ -4,6 +4,7 @@ use std::env;
 use std::env::Args;
 use std::fs::File;
 use std::str::FromStr;
+use std::time::Instant;
 
 enum CliErr {
     MissingMode,
@@ -57,10 +58,12 @@ fn run() -> Result<(), CliErr> {
 
     let files: Vec<File> = open_files(file_names)?;
 
+    let starting_time = Instant::now();
+
     match mode.as_str() {
-        "seq" => print_all(grep_seq(pattern.clone(), files)),
-        "conc" => print_all(grep_conc(&pattern, files)),
-        "c-chunk" => print_all(grep_chunk(&pattern, files, chunk_size)),
+        "seq" => print_all(grep_seq(pattern.clone(), files), starting_time),
+        "conc" => print_all(grep_conc(&pattern, files), starting_time),
+        "c-chunk" => print_all(grep_chunk(&pattern, files, chunk_size), starting_time),
         _ => Err(UnknownMode(mode.clone())),
     }
 }
@@ -90,8 +93,10 @@ fn open_files(file_names: impl Iterator<Item = String>) -> Result<Vec<File>, Cli
         .collect()
 }
 
-fn print_all(filtered_lines: Vec<String>) -> Result<(), CliErr> {
+fn print_all(filtered_lines: Vec<String>, starting_time: Instant) -> Result<(), CliErr> {
+    let elapsed_time = starting_time.elapsed().as_millis();
+
     filtered_lines.iter().for_each(|line| println!("{}", line));
-    println!("(Found {} matches)", filtered_lines.len());
+    println!("(Found {} matches in {}ms)", filtered_lines.len(), elapsed_time);
     Ok(())
 }
