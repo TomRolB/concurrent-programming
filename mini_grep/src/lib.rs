@@ -1,9 +1,9 @@
+use std::thread::ScopedJoinHandle;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
     thread,
 };
-use std::thread::ScopedJoinHandle;
 
 pub fn grep_seq(pattern: String, files: Vec<File>) -> Vec<String> {
     files
@@ -18,26 +18,26 @@ pub fn grep_seq(pattern: String, files: Vec<File>) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-pub fn grep_conc(pattern: &String, files: Vec<File>) -> Vec<String> {
-    thread::scope(|s| {
-        let threads = files.iter().map(|file| {
-            s.spawn(move || {
-                BufReader::new(file)
-                    .lines()
-                    .map(|line| line.unwrap())
-                    .filter(move |line| line.contains(pattern))
-            })
-        });
+pub fn grep_conc(pattern: &String, files: Vec<String>) -> Vec<String> {
+    let threads = files.iter().map(|file| {
+        let pattern_clone = pattern.clone();
 
-        threads.map(|t| t.join().unwrap()).flatten().collect()
-    })
+        thread::spawn(move || {
+            BufReader::new(File::open(file))
+                .lines()
+                .map(|line| line.unwrap())
+                .filter(move |line| line.contains(&pattern_clone))
+                .collect::<Vec<_>>()
+        })
+    });
+
+    threads.map(|t| t.join().unwrap()).flatten().collect()
 }
 
 pub fn grep_chunk(pattern: &String, files: Vec<File>, chunk_size: usize) -> Vec<String> {
     thread::scope(|s| {
         let file_threads = files.iter().map(|file| {
             s.spawn(move || {
-
                 let mut count = 0;
                 let mut buffered_lines: Vec<String> = Vec::with_capacity(chunk_size);
                 let mut chunk_threads: Vec<ScopedJoinHandle<'_, Vec<String>>> = vec![];
@@ -49,9 +49,10 @@ pub fn grep_chunk(pattern: &String, files: Vec<File>, chunk_size: usize) -> Vec<
 
                     if count >= chunk_size {
                         let filtered_lines = s.spawn(move || {
-                          buffered_lines.into_iter()
-                              .filter(move |line| line.contains(pattern))
-                              .collect()
+                            buffered_lines
+                                .into_iter()
+                                .filter(move |line| line.contains(pattern))
+                                .collect()
                         });
 
                         chunk_threads.push(filtered_lines);
@@ -63,7 +64,8 @@ pub fn grep_chunk(pattern: &String, files: Vec<File>, chunk_size: usize) -> Vec<
 
                 if buffered_lines.len() > 0 {
                     let filtered_lines = s.spawn(move || {
-                        buffered_lines.into_iter()
+                        buffered_lines
+                            .into_iter()
                             .filter(move |line| line.contains(pattern))
                             .collect()
                     });
@@ -71,11 +73,15 @@ pub fn grep_chunk(pattern: &String, files: Vec<File>, chunk_size: usize) -> Vec<
                     chunk_threads.push(filtered_lines);
                 }
 
-                chunk_threads.into_iter().map(|t| t.join().unwrap()).flatten()
+                chunk_threads
+                    .into_iter()
+                    .map(|t| t.join().unwrap())
+                    .flatten()
             })
         });
 
-        file_threads.into_iter()
+        file_threads
+            .into_iter()
             .map(|t| t.join().unwrap())
             .flatten()
             .collect()
@@ -149,7 +155,7 @@ mod tests {
                 File::open("resources/test1.txt").unwrap(),
                 File::open("resources/bible.txt").unwrap(),
             ],
-            10000
+            10000,
         );
         assert_eq!(
             result,
