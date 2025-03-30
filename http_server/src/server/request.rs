@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::net::TcpStream;
 use std::io::{BufRead, BufReader};
+use std::net::TcpStream;
 use ParseError::UnknownMethod;
 
 #[derive(PartialEq, Eq)]
@@ -13,23 +13,24 @@ pub enum RequestMethod {
     CONNECT,
     OPTIONS,
     TRACE,
-    PATCH
+    PATCH,
 }
 
 pub struct Request {
     pub method: RequestMethod,
     pub uri: String,
     pub headers: HashMap<String, String>,
-    pub body: String
+    pub body: String,
 }
 
 pub enum ParseError {
-    UnknownMethod(String)
+    UnknownMethod(String),
 }
 
 pub fn parse(stream: &TcpStream) -> Result<Request, ParseError> {
     let buf_reader = BufReader::new(stream);
-    let lines: Vec<String> = buf_reader.lines()
+    let lines: Vec<String> = buf_reader
+        .lines()
         .map(|result| result.unwrap())
         .take_while(|line| !line.is_empty()) // server body comes after first empty line
         .collect();
@@ -45,16 +46,16 @@ pub fn parse(stream: &TcpStream) -> Result<Request, ParseError> {
         "OPTIONS" => Ok(RequestMethod::OPTIONS),
         "TRACE" => Ok(RequestMethod::TRACE),
         "PATCH" => Ok(RequestMethod::PATCH),
-        _ => Err(UnknownMethod(method_uri_version[0].to_string()))
+        _ => Err(UnknownMethod(method_uri_version[0].to_string())),
     }?;
 
     let uri = method_uri_version[1];
 
-    Ok(Request { 
+    Ok(Request {
         method,
         uri: uri.to_string(),
         headers: HashMap::new(), // TODO: parse
-        body: "".to_string() // TODO: parse
+        body: "".to_string(),    // TODO: parse
     })
 }
 
@@ -63,8 +64,7 @@ pub fn get_param(uri: String) -> Result<u32, String> {
         Some(num) => num,
         None => "",
     };
-    
-    str::parse::<u32>(num_as_string)
-        .or_else(|_| Err( format!("'{}' is not a number", num_as_string)))
-}
 
+    str::parse::<u32>(num_as_string)
+        .or_else(|_| Err(format!("'{}' is not a number", num_as_string)))
+}
