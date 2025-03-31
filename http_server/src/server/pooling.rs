@@ -4,10 +4,10 @@ use std::thread;
 
 
 const N_THREADS: u8 = 8;
-type SyncReceiverArc = Arc<Mutex<Receiver<Box<dyn Fn()>>>>;
+type SyncReceiverArc = Arc<Mutex<Receiver<Box<dyn Send + FnOnce()>>>>;
 
-pub fn create_pool_and_get_sender() -> Sender<Box<dyn Fn()>> {
-    let (tx, rx) = channel::<Box<dyn Fn()>>();
+pub fn create_pool_and_get_sender() -> Sender<Box<dyn Send + FnOnce()>> {
+    let (tx, rx) = channel::<Box<dyn Send + FnOnce()>>();
     let rx_arc = Arc::new(Mutex::new(rx));
 
     for _ in 0..N_THREADS {

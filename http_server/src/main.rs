@@ -19,15 +19,15 @@ fn main() {
     }
 }
 
-fn send_request_handling_task(thread_pool_task_sender: &Sender<impl Fn()>, stream: TcpStream) {
+fn send_request_handling_task(thread_pool_task_sender: &Sender<Box<dyn Send + FnOnce()>>, stream: TcpStream) {
     thread_pool_task_sender
-        .send(|| {
+        .send(Box::new(|| {
             let mut stream = stream;
 
             let result = handle_request(&mut stream);
             stream.write_all(result.as_bytes()).unwrap();
-        })
-        .unwrap_or_else(|| {
+        }))
+        .unwrap_or_else(|_| {
             println!("Channel closed: the receiver has been deallocated");
             return;
         });
