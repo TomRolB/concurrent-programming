@@ -22,9 +22,9 @@ pub fn create_pool_and_get_sender() -> Sender<Box<dyn Send + FnOnce()>> {
 
 fn check_and_run_tasks(sync_receiver_arc: SyncReceiverArc) {
     loop {
-        let task = sync_receiver_arc.lock().unwrap().recv();
+        let task_result = sync_receiver_arc.lock().unwrap().recv();
         // TODO: here we shouldn't unwrap, since the mutex could be poisoned (i.e. some other thread may have panicked while having the resource locked)
-        match task {
+        match task_result {
             Ok(task) => task(),
             Err(_) => {
                 return;
