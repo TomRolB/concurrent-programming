@@ -1,27 +1,30 @@
 use std::io::Write;
+use std::thread;
 use std::net::{TcpListener, TcpStream};
+use std::time::Instant;
 
-mod utils;
 mod core;
 mod server;
 
 use server::request::{ParseError, RequestMethod};
-use utils::time;
 use crate::core::math;
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
+    let listener = TcpListener::bind("127.0.0.1:3030").unwrap();
 
     for stream in listener.incoming() {
-        let mut stream = stream.unwrap();
+        thread::spawn(|| {
+            let mut stream = stream.unwrap();
 
-        let response = handle_request(&mut stream);
+            let result = handle_request(&mut stream);
 
-        stream.write_all(response.as_bytes()).unwrap();
+            stream.write_all(result.as_bytes()).unwrap();
+        });
     }
 }
 
 fn handle_request(stream: &mut TcpStream) -> String {
+    let start = Instant::now();
     let request = match server::request::parse(&stream) {
         Ok(request) => request,
         Err(ParseError::UnknownMethod(method)) => {
@@ -38,13 +41,13 @@ fn handle_request(stream: &mut TcpStream) -> String {
         Err(message) => { return get_response(400, message) }
     };
 
-    let time::Timed { duration, result } =
-        time::execute_and_time(|| math::compute_pi(term));
+    let result = math::compute_pi(term);
+
     let response_message = format!(
         "Value of Pi for the term {}: {} (time: {}s)",
         term,
         result,
-        duration.as_secs_f32()
+        start.elapsed().as_secs_f32()
     );
 
     get_response(200, response_message)
@@ -53,3 +56,4 @@ fn handle_request(stream: &mut TcpStream) -> String {
 fn get_response(code: u16, body: String) -> String {
     format!("HTTP/1.1 {} \r\n\r\n{}\n", code, body)
 }
+
