@@ -54,16 +54,16 @@ fn run() -> Result<(), CliErr> {
     let chunk_size = get_chunk_size(&mut args, &mode)?;
 
     let pattern = args.next().ok_or(MissingPattern)?;
-    let file_names = get_remaining(&mut args)?;
+    let file_names: Vec<String> = get_remaining(&mut args)?.collect();
 
-    let files: Vec<File> = open_files(file_names)?;
+    // let files: Vec<File> = open_files(file_names)?;
 
     let starting_time = Instant::now();
 
     match mode.as_str() {
-        "seq" => print_all(grep_seq(pattern.clone(), files), starting_time),
-        "conc" => print_all(grep_conc(&pattern, files), starting_time),
-        "c-chunk" => print_all(grep_chunk(&pattern, files, chunk_size), starting_time),
+        "seq" => print_all(grep_seq(pattern.clone(), file_names), starting_time),
+        "conc" => print_all(grep_conc(pattern.clone(), file_names), starting_time),
+        // "c-chunk" => print_all(grep_chunk(&pattern, file_names, chunk_size), starting_time),
         _ => Err(UnknownMode(mode.clone())),
     }
 }
