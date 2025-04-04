@@ -29,25 +29,19 @@ pub fn grep_chunk(pattern: String, file_names: Vec<String>, chunk_size: usize) -
     let file_threads = file_names.into_iter().map(|file_name| {
         let pattern_clone = pattern.clone();
         thread::spawn(move || {
-            let mut count = 0;
-            let mut buffered_lines: Vec<String> = Vec::with_capacity(chunk_size.clone());
             let mut chunk_threads: Vec<JoinHandle<Vec<String>>> = vec![];
 
             let mut br = BufReader::new(File::open(file_name).unwrap()).lines();
-            while let Some(line) = br.next() {
-                buffered_lines.push(line.unwrap());
-                count += 1;
 
-                if count >= chunk_size {
-                    append_chunk_thread(buffered_lines, &mut chunk_threads, pattern_clone.clone());
+            loop {
+                let chunk: Vec<String> = br.by_ref()
+                    .take(chunk_size)
+                    .map(|line| line.unwrap())
+                    .collect::<Vec<_>>();
 
-                    count = 0;
-                    buffered_lines = vec![];
-                }
-            }
+                if chunk.is_empty() { break; };
 
-            if buffered_lines.len() > 0 {
-                append_chunk_thread(buffered_lines, &mut chunk_threads, pattern_clone.clone());
+                append_chunk_thread(chunk, &mut chunk_threads, pattern_clone.clone());
             }
 
             chunk_threads
