@@ -8,7 +8,7 @@ use std::{
 pub fn grep_seq(pattern: String, file_names: Vec<String>) -> Vec<String> {
     file_names
         .into_iter()
-        .map(|file_name| { filter_lines_from_file(file_name, pattern.clone()) })
+        .map(|file_name| filter_lines_from_file(file_name, pattern.clone()))
         .flatten()
         .collect::<Vec<_>>()
 }
@@ -16,40 +16,19 @@ pub fn grep_seq(pattern: String, file_names: Vec<String>) -> Vec<String> {
 pub fn grep_conc(pattern: String, files: Vec<String>) -> Vec<String> {
     let threads = files.into_iter().map(|file| {
         let pattern_clone = pattern.clone();
-        thread::spawn(|| {
-            filter_lines_from_file(file, pattern_clone)
-                .collect::<Vec<_>>()
-        })
+        thread::spawn(|| filter_lines_from_file(file, pattern_clone).collect::<Vec<_>>())
     });
 
-    threads.map(|t| t.join().unwrap()).flatten().collect::<Vec<_>>()
+    threads
+        .map(|t| t.join().unwrap())
+        .flatten()
+        .collect::<Vec<_>>()
 }
 
 pub fn grep_chunk(pattern: String, file_names: Vec<String>, chunk_size: usize) -> Vec<String> {
-    let file_threads = file_names.into_iter().map(|file_name| {
-        let pattern_clone = pattern.clone();
-        thread::spawn(move || {
-            let mut chunk_threads: Vec<JoinHandle<Vec<String>>> = vec![];
-
-            let mut br = BufReader::new(File::open(file_name).unwrap()).lines();
-
-            loop {
-                let chunk: Vec<String> = br.by_ref()
-                    .take(chunk_size)
-                    .map(|line| line.unwrap())
-                    .collect::<Vec<_>>();
-
-                if chunk.is_empty() { break; };
-
-                append_chunk_thread(chunk, &mut chunk_threads, pattern_clone.clone());
-            }
-
-            chunk_threads
-                .into_iter()
-                .map(|t| t.join().unwrap())
-                .flatten()
-        })
-    });
+    let file_threads = file_names
+        .into_iter()
+        .map(|file_name| spawn_file_thread(file_name, chunk_size.clone(), pattern.clone()));
 
     file_threads
         .into_iter()
@@ -65,13 +44,53 @@ fn filter_lines_from_file(file_name: String, pattern: String) -> impl Iterator<I
         .filter(move |line| line.contains(&pattern))
 }
 
-fn append_chunk_thread(
-    buffered_lines: Vec<String>,
+fn spawn_file_thread(
+    file_name: String,
+    chunk_size: usize,
+    pattern: String,
+) -> JoinHandle<impl Iterator<Item = String>> {
+    thread::spawn(move || {
+        let chunk_threads = split_file_into_chunks(file_name, chunk_size.clone(), pattern);
+
+        chunk_threads
+            .into_iter()
+            .map(|t| t.join().unwrap())
+            .flatten()
+    })
+}
+
+fn split_file_into_chunks(
+    file_name: String,
+    chunk_size: usize,
+    pattern: String,
+) -> Vec<JoinHandle<Vec<String>>> {
+    let mut chunk_threads: Vec<JoinHandle<Vec<String>>> = vec![];
+    let mut br = BufReader::new(File::open(file_name).unwrap()).lines();
+
+    loop {
+        let chunk: Vec<String> = br
+            .by_ref()
+            .take(chunk_size)
+            .map(|line| line.unwrap())
+            .collect::<Vec<_>>();
+
+        if chunk.is_empty() {
+            break;
+        };
+
+        add_new_chunk_thread(chunk, &mut chunk_threads, pattern.clone());
+    }
+
+    chunk_threads
+}
+
+fn add_new_chunk_thread(
+    chunk: Vec<String>,
     chunk_threads: &mut Vec<JoinHandle<Vec<String>>>,
-    pattern: String
+    pattern: String,
 ) {
     let filtered_lines: JoinHandle<Vec<String>> = thread::spawn(move || {
-        buffered_lines
+        chunk
             .into_iter()
             .filter(move |line| line.contains(&pattern))
             .collect()
@@ -86,10 +105,7 @@ mod tests {
 
     #[test]
     fn single_file() {
-        let result = grep_seq(
-            "test".to_string(),
-            vec!["resources/test1.txt".to_string()],
-        );
+        let result = grep_seq("test".to_string(), vec!["resources/test1.txt".to_string()]);
         assert_eq!(
             result,
             vec![
@@ -101,10 +117,7 @@ mod tests {
 
     #[test]
     fn single_file_conc() {
-        let result = grep_conc(
-            "test".to_string(),
-            vec!["resources/test1.txt".to_string()],
-        );
+        let result = grep_conc("test".to_string(), vec!["resources/test1.txt".to_string()]);
         assert_eq!(
             result,
             vec![

@@ -1,8 +1,7 @@
-use crate::CliErr::{FileNotFound, MissingFiles, MissingChunkSize, ParseChunkSizeError, MissingMode, MissingPattern, UnknownMode};
+use crate::CliErr::{MissingChunkSize, MissingFiles, MissingMode, MissingPattern, ParseChunkSizeError, UnknownMode};
 use mini_grep::{grep_chunk, grep_conc, grep_seq};
 use std::env;
 use std::env::Args;
-use std::fs::File;
 use std::str::FromStr;
 use std::time::Instant;
 
@@ -12,7 +11,6 @@ enum CliErr {
     ParseChunkSizeError,
     MissingPattern,
     MissingFiles,
-    FileNotFound(String),
     UnknownMode(String),
 }
 
@@ -28,9 +26,6 @@ fn main() {
             print_error("No pattern was passed. Must be a string to be searched.")
         }
         Err(MissingFiles) => print_error("No file names were passed. Must be at least one."),
-        Err(FileNotFound(file_name)) => {
-            print_error(format!("Could not find file '{}'.", file_name).as_str())
-        }
         Err(UnknownMode(mode)) => print_error(format!("Unknown mode '{}'.", mode).as_str()),
         Err(MissingChunkSize) => {
             print_error("No chunk size was passed, even though selected option is 'c-chunk'".as_ref())
@@ -63,7 +58,7 @@ fn run() -> Result<(), CliErr> {
     match mode.as_str() {
         "seq" => print_all(grep_seq(pattern.clone(), file_names), starting_time),
         "conc" => print_all(grep_conc(pattern.clone(), file_names), starting_time),
-        // "c-chunk" => print_all(grep_chunk(&pattern, file_names, chunk_size), starting_time),
+        "c-chunk" => print_all(grep_chunk(pattern.clone(), file_names, chunk_size), starting_time),
         _ => Err(UnknownMode(mode.clone())),
     }
 }
@@ -87,16 +82,10 @@ fn get_remaining(args: &mut Args) -> Result<impl Iterator<Item = String>, CliErr
     Ok(peekable_args)
 }
 
-fn open_files(file_names: impl Iterator<Item = String>) -> Result<Vec<File>, CliErr> {
-    file_names
-        .map(|file_name| File::open(&file_name).map_err(|_| FileNotFound(file_name.clone())))
-        .collect()
-}
-
 fn print_all(filtered_lines: Vec<String>, starting_time: Instant) -> Result<(), CliErr> {
     let elapsed_time = starting_time.elapsed().as_millis();
 
     filtered_lines.iter().for_each(|line| println!("{}", line));
-    println!("(Found {} matches in {}ms)", filtered_lines.len(), elapsed_time);
+    println!("\n(Found {} matches in {}ms)", filtered_lines.len(), elapsed_time);
     Ok(())
 }
