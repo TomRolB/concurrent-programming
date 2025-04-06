@@ -46,17 +46,15 @@ fn run() -> Result<(), CliErr> {
     args.next();
 
     let mode = args.next().ok_or(MissingMode)?;
-    let chunk_size = get_chunk_size(&mut args, &mode)?;
-
     let pattern = args.next().ok_or(MissingPattern)?;
-    let file_names: Vec<String> = get_remaining(&mut args)?.collect();
+    let file_names: Vec<String> = get_remaining(&mut args)?;
 
     let starting_time = Instant::now();
 
     let result = match mode.as_str() {
         "seq" => grep_seq(pattern.clone(), file_names),
         "conc" => grep_conc(pattern.clone(), file_names),
-        "c-chunk" => grep_chunk(pattern.clone(), file_names, chunk_size),
+        "c-chunk" => grep_chunk(pattern.clone(), file_names),
         _ => Err(UnknownMode(mode.clone()))?,
     };
 
@@ -72,13 +70,13 @@ fn get_chunk_size(args: &mut Args, mode: &String) -> Result<usize, CliErr> {
     }
 }
 
-fn get_remaining(args: &mut Args) -> Result<impl Iterator<Item = String>, CliErr> {
-    let mut peekable_args = args.peekable();
-    if let None = peekable_args.peek() {
-        return Err(MissingFiles);
-    };
+fn get_remaining(args: &mut Args) -> Result<Vec<String>, CliErr> {
+    let file_names = args.collect::<Vec<String>>();
 
-    Ok(peekable_args)
+    if file_names.is_empty() {
+        return Err(MissingFiles)
+    }
+    Ok(file_names)
 }
 
 fn print_all(filtered_lines: Vec<String>, starting_time: Instant) -> Result<(), CliErr> {

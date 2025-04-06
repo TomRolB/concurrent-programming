@@ -5,6 +5,8 @@ use std::{
     thread,
 };
 
+const CHUNK_SIZE: usize = 10_000;
+
 pub fn grep_seq(pattern: String, file_names: Vec<String>) -> Vec<String> {
     file_names
         .into_iter()
@@ -25,10 +27,10 @@ pub fn grep_conc(pattern: String, file_names: Vec<String>) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-pub fn grep_chunk(pattern: String, file_names: Vec<String>, chunk_size: usize) -> Vec<String> {
+pub fn grep_chunk(pattern: String, file_names: Vec<String>) -> Vec<String> {
     let file_threads = file_names
         .into_iter()
-        .map(|file_name| spawn_file_thread(file_name, chunk_size.clone(), pattern.clone()));
+        .map(|file_name| spawn_file_thread(file_name, CHUNK_SIZE, pattern.clone()));
 
     file_threads
         .into_iter()
@@ -164,7 +166,6 @@ mod tests {
                 "resources/test1.txt".to_string(),
                 "resources/bible.txt".to_string(),
             ],
-            10000,
         );
         assert_found_thread_for_both_texts(result);
     }
