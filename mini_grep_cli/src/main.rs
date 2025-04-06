@@ -1,8 +1,9 @@
-use crate::CliErr::{FileNotFound, MissingFiles, MissingChunkSize, ParseChunkSizeError, MissingMode, MissingPattern, UnknownMode};
+use crate::CliErr::{
+    MissingChunkSize, MissingFiles, MissingMode, MissingPattern, ParseChunkSizeError, UnknownMode,
+};
 use mini_grep::{grep_chunk, grep_conc, grep_seq};
 use std::env;
 use std::env::Args;
-use std::fs::File;
 use std::str::FromStr;
 use std::time::Instant;
 
@@ -12,7 +13,6 @@ enum CliErr {
     ParseChunkSizeError,
     MissingPattern,
     MissingFiles,
-    FileNotFound(String),
     UnknownMode(String),
 }
 
@@ -28,16 +28,11 @@ fn main() {
             print_error("No pattern was passed. Must be a string to be searched.")
         }
         Err(MissingFiles) => print_error("No file names were passed. Must be at least one."),
-        Err(FileNotFound(file_name)) => {
-            print_error(format!("Could not find file '{}'.", file_name).as_str())
-        }
         Err(UnknownMode(mode)) => print_error(format!("Unknown mode '{}'.", mode).as_str()),
-        Err(MissingChunkSize) => {
-            print_error("No chunk size was passed, even though selected option is 'c-chunk'".as_ref())
-        },
-        Err(ParseChunkSizeError) => {
-            print_error("Could not parse chunk size".as_ref())
-        },
+        Err(MissingChunkSize) => print_error(
+            "No chunk size was passed, even though selected option is 'c-chunk'".as_ref(),
+        ),
+        Err(ParseChunkSizeError) => print_error("Could not parse chunk size".as_ref()),
     };
 }
 
@@ -54,25 +49,24 @@ fn run() -> Result<(), CliErr> {
     let chunk_size = get_chunk_size(&mut args, &mode)?;
 
     let pattern = args.next().ok_or(MissingPattern)?;
-    let file_names = get_remaining(&mut args)?;
-
-    let files: Vec<File> = open_files(file_names)?;
+    let file_names: Vec<String> = get_remaining(&mut args)?.collect();
 
     let starting_time = Instant::now();
 
-    match mode.as_str() {
-        "seq" => print_all(grep_seq(pattern.clone(), files), starting_time),
-        "conc" => print_all(grep_conc(&pattern, files), starting_time),
-        "c-chunk" => print_all(grep_chunk(&pattern, files, chunk_size), starting_time),
-        _ => Err(UnknownMode(mode.clone())),
-    }
+    let result = match mode.as_str() {
+        "seq" => grep_seq(pattern.clone(), file_names),
+        "conc" => grep_conc(pattern.clone(), file_names),
+        "c-chunk" => grep_chunk(pattern.clone(), file_names, chunk_size),
+        _ => Err(UnknownMode(mode.clone()))?,
+    };
+
+    print_all(result, starting_time)
 }
 
 fn get_chunk_size(args: &mut Args, mode: &String) -> Result<usize, CliErr> {
     if mode == "c-chunk" {
         let chunks_as_string = args.next().ok_or(MissingChunkSize)?;
-        usize::from_str(chunks_as_string.as_str())
-            .map_err(|_| ParseChunkSizeError)
+        usize::from_str(chunks_as_string.as_str()).map_err(|_| ParseChunkSizeError)
     } else {
         Ok(0)
     }
@@ -87,16 +81,14 @@ fn get_remaining(args: &mut Args) -> Result<impl Iterator<Item = String>, CliErr
     Ok(peekable_args)
 }
 
-fn open_files(file_names: impl Iterator<Item = String>) -> Result<Vec<File>, CliErr> {
-    file_names
-        .map(|file_name| File::open(&file_name).map_err(|_| FileNotFound(file_name.clone())))
-        .collect()
-}
-
 fn print_all(filtered_lines: Vec<String>, starting_time: Instant) -> Result<(), CliErr> {
     let elapsed_time = starting_time.elapsed().as_millis();
 
     filtered_lines.iter().for_each(|line| println!("{}", line));
-    println!("(Found {} matches in {}ms)", filtered_lines.len(), elapsed_time);
+    println!(
+        "\n(Found {} matches in {}ms)",
+        filtered_lines.len(),
+        elapsed_time
+    );
     Ok(())
 }
