@@ -1,43 +1,44 @@
-use crate::CliErr::{
-    MissingChunkSize, MissingFiles, MissingMode, MissingPattern, ParseChunkSizeError, UnknownMode,
-};
+use crate::CliErr::{MissingFiles, MissingMode, MissingPattern, UnknownMode};
 use mini_grep::{grep_chunk, grep_conc, grep_seq};
 use std::env;
 use std::env::Args;
-use std::str::FromStr;
 use std::time::Instant;
 
 enum CliErr {
     MissingMode,
-    MissingChunkSize,
-    ParseChunkSizeError,
     MissingPattern,
     MissingFiles,
     UnknownMode(String),
 }
 
 fn main() {
-    // TODO: Better error messages. Should display the desired command structure,
-    //  explaining each argument
     match run() {
         Ok(()) => {}
         Err(MissingMode) => {
-            print_error("No mode was passed. Must be one of 'seq', 'conc' and 'c-chunk.'")
+            print_error("No mode was passed. Must be one of 'seq', 'conc' or 'c-chunk.'")
         }
         Err(MissingPattern) => {
             print_error("No pattern was passed. Must be a string to be searched.")
         }
         Err(MissingFiles) => print_error("No file names were passed. Must be at least one."),
         Err(UnknownMode(mode)) => print_error(format!("Unknown mode '{}'.", mode).as_str()),
-        Err(MissingChunkSize) => print_error(
-            "No chunk size was passed, even though selected option is 'c-chunk'".as_ref(),
-        ),
-        Err(ParseChunkSizeError) => print_error("Could not parse chunk size".as_ref()),
     };
 }
 
 fn print_error(message: &str) {
-    println!("{}Error{}: {}", "\x1B[31m", "\x1B[0m", message)
+    println!(
+        "{}Error{}: {}
+        \nCommand should be:
+        cargo run -- <mode> <pattern> <file 1> <file 2> ... <file n>
+        \nWhere:
+        * 'mode' must be one of 'seq', 'conc' or 'c-chunk'
+        * 'pattern' is a string to be searched'
+        * '<file 1> <file 2> ... <file n>' are the paths to the files where the pattern will be searched
+        ",
+        "\x1B[31m",
+        "\x1B[0m",
+         message
+    );
 }
 
 fn run() -> Result<(), CliErr> {
@@ -61,20 +62,11 @@ fn run() -> Result<(), CliErr> {
     print_all(result, starting_time)
 }
 
-fn get_chunk_size(args: &mut Args, mode: &String) -> Result<usize, CliErr> {
-    if mode == "c-chunk" {
-        let chunks_as_string = args.next().ok_or(MissingChunkSize)?;
-        usize::from_str(chunks_as_string.as_str()).map_err(|_| ParseChunkSizeError)
-    } else {
-        Ok(0)
-    }
-}
-
 fn get_remaining(args: &mut Args) -> Result<Vec<String>, CliErr> {
     let file_names = args.collect::<Vec<String>>();
 
     if file_names.is_empty() {
-        return Err(MissingFiles)
+        return Err(MissingFiles);
     }
     Ok(file_names)
 }
