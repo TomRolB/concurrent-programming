@@ -13,8 +13,8 @@ pub fn grep_seq(pattern: String, file_names: Vec<String>) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-pub fn grep_conc(pattern: String, files: Vec<String>) -> Vec<String> {
-    let threads = files.into_iter().map(|file| {
+pub fn grep_conc(pattern: String, file_names: Vec<String>) -> Vec<String> {
+    let threads = file_names.into_iter().map(|file| {
         let pattern_clone = pattern.clone();
         thread::spawn(|| filter_lines_from_file(file, pattern_clone).collect::<Vec<_>>())
     });
@@ -50,7 +50,7 @@ fn spawn_file_thread(
     pattern: String,
 ) -> JoinHandle<impl Iterator<Item = String>> {
     thread::spawn(move || {
-        let chunk_threads = split_file_into_chunks(file_name, chunk_size.clone(), pattern);
+        let chunk_threads = split_file_into_chunk_threads(file_name, chunk_size.clone(), pattern);
 
         chunk_threads
             .into_iter()
@@ -59,7 +59,7 @@ fn spawn_file_thread(
     })
 }
 
-fn split_file_into_chunks(
+fn split_file_into_chunk_threads(
     file_name: String,
     chunk_size: usize,
     pattern: String,
