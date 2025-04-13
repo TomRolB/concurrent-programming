@@ -19,7 +19,7 @@ pub fn count_word_in_file(
 
     let parsed_headers = parse_headers(&headers);
     let content_disposition = parsed_headers
-        .get("Content-Disposition")
+        .get("content-disposition")
         .ok_or("Could not find Content-Disposition in file headers")?;
 
     let file_name = get_file_name(content_disposition)?;
@@ -28,6 +28,7 @@ pub fn count_word_in_file(
         .by_ref()
         .lines()
         .map(|line| line.unwrap())
+        .take_while(|line| !line.contains(boundary))
         .filter(|line| line.contains(&word))
         .count();
 
@@ -38,6 +39,6 @@ fn get_file_name(content_disposition: &String) -> Result<String, String> {
     if let Some((_, file_name)) = content_disposition.split_once("filename=") {
         Ok(file_name.trim_matches('"').to_string())
     } else {
-        Err("Could not find file name in Content-Disposition".to_string())
+        Err("File not found or empty".to_string())
     }
 }
