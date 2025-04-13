@@ -2,11 +2,12 @@ use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 
-mod core;
+mod services;
 mod server;
 
 use crate::server::pooling;
-use server::request::{Request, ParseError, RequestMethod};
+use server::request::{ParseError, Request, RequestMethod};
+use crate::services::word_count::count_word_in_file;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:3030").unwrap();
@@ -32,7 +33,7 @@ fn send_request_handling_task(thread_pool_task_sender: &Sender<Box<dyn Send + Fn
 }
 
 fn handle_request(stream: &mut TcpStream) -> String {
-    let request = match server::request::parse(&stream) {
+    let mut request = match server::request::parse(&stream) {
         Ok(request) => request,
         Err(ParseError::UnknownMethod(method)) => {
             return get_response(501, format!("Unknown method: {}", method));
@@ -46,8 +47,18 @@ fn handle_request(stream: &mut TcpStream) -> String {
         Request {method: RequestMethod::GET, uri, body, headers} if uri == STATS_URI.to_string() => {
 
         }
-        Request {method: RequestMethod::POST, uri, body, headers} if uri == UPLOAD_URI.to_string() => {
-        
+        Request {method: RequestMethod::POST, uri, mut body, headers} if uri == UPLOAD_URI.to_string() => {
+            let content_type = match headers.get("Content-Type") {
+                None => { return get_response(400, "No Content-Type found".to_string()) }
+                Some(content_type) => { content_type }
+            };
+
+            let boundary = match parse_boundary(content_type) {
+                Some(boundary) => { boundary }
+                None => { return get_response(400, "No file boundary found".to_string()) }
+            };
+
+            count_word_in_file("exception".to_string(), body, &boundary);
         }
         _ => {
 
@@ -55,6 +66,14 @@ fn handle_request(stream: &mut TcpStream) -> String {
     }
 
     get_response(200, "holis".to_string())
+}
+
+fn parse_boundary(content_type: &String) -> Option<String> {
+    if let Some((_, boundary)) = content_type.split_once("boundary=") {
+        Some(boundary.to_string())
+    } else {
+        None
+    }
 }
 
 fn get_response(code: u16, body: String) -> String {

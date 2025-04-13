@@ -61,7 +61,7 @@ pub fn parse(stream: &TcpStream) -> Result<Request, ParseError> {
     })
 }
 
-fn parse_headers(lines: &Vec<String>) -> HashMap<String, String> {
+pub fn parse_headers(lines: &Vec<String>) -> HashMap<String, String> {
     let mut mapubi = HashMap::<String, String>::new();
     for line in lines.into_iter().skip(1) {
         if let Some((key, value)) = line.split_once(": ") {
