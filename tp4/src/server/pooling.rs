@@ -2,7 +2,6 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-
 const N_THREADS: u8 = 8;
 type SyncReceiverArc = Arc<Mutex<Receiver<Box<dyn Send + FnOnce()>>>>;
 

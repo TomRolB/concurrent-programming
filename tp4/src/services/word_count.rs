@@ -1,10 +1,14 @@
+use crate::server::request::parse_headers;
 use std::io::{BufRead, BufReader, Read};
 use std::net::TcpStream;
-use crate::server::request::parse_headers;
 
-pub struct FileWordCount(String, usize);
+pub struct FileWordCount(pub String, pub usize);
 
-pub fn count_word_in_file(word: String, mut file: BufReader<&TcpStream>, boundary: &String) -> Result<FileWordCount, String> {
+pub fn count_word_in_file(
+    word: String,
+    mut file: BufReader<&TcpStream>,
+    boundary: &String,
+) -> Result<FileWordCount, String> {
     let headers = file
         .by_ref()
         .lines()
@@ -12,7 +16,6 @@ pub fn count_word_in_file(word: String, mut file: BufReader<&TcpStream>, boundar
         .skip_while(|line| !line.contains(boundary))
         .take_while(|line| !line.is_empty()) // server body comes after first empty line
         .collect();
-
 
     let parsed_headers = parse_headers(&headers);
     let content_disposition = parsed_headers

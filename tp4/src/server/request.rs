@@ -20,7 +20,7 @@ pub struct Request<'a> {
     pub method: RequestMethod,
     pub uri: String,
     pub headers: HashMap<String, String>,
-    pub body: BufReader<&'a TcpStream>
+    pub body: BufReader<&'a TcpStream>,
 }
 
 pub enum ParseError {
@@ -29,11 +29,13 @@ pub enum ParseError {
 
 pub fn parse(stream: &TcpStream) -> Result<Request, ParseError> {
     let mut reader = BufReader::new(stream);
-    let request_headers: Vec<String> = reader.by_ref().lines()
+    let request_headers: Vec<String> = reader
+        .by_ref()
+        .lines()
         .map(|result| result.unwrap())
         .take_while(|line| !line.is_empty()) // server body comes after first empty line
         .collect();
-    
+
     let headers_map: HashMap<String, String> = parse_headers(&request_headers);
 
     let method_uri_version: Vec<&str> = request_headers[0].split(" ").collect();
@@ -52,7 +54,6 @@ pub fn parse(stream: &TcpStream) -> Result<Request, ParseError> {
 
     let uri = method_uri_version[1];
 
-
     Ok(Request {
         method,
         uri: uri.to_string(),
@@ -70,4 +71,3 @@ pub fn parse_headers(lines: &Vec<String>) -> HashMap<String, String> {
     }
     mapubi
 }
-
