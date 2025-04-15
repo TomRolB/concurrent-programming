@@ -29,7 +29,7 @@ pub fn count_word_in_file(
         .lines()
         .map(|line| line.unwrap())
         .take_while(|line| !line.contains(boundary))
-        .filter(|line| line.contains(&word))
+        .filter(|line| line.to_lowercase().contains(&word))
         .count();
 
     Ok(FileWordCount(file_name, count))
