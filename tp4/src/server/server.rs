@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::net::TcpListener;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
+use std::io::Write;
 use tokio::sync::Semaphore;
 
 use crate::routes;
@@ -36,8 +37,11 @@ impl Server {
         for stream in listener.incoming() {
             let server_arc = self.clone();
             self.thread_pool_task_sender.send(Box::new(move || {
-                let stream = stream.unwrap();
-                routes::route_handler::handle_request(stream, server_arc);
+                let mut stream = stream.unwrap();
+                let response = routes::route_handler::handle_request(&stream, server_arc);
+                stream.write_all(response.as_bytes()).unwrap_or_else(|_| {
+                    println!("Failed to write response to stream");
+                });
             })).unwrap_or_else(|_| {
                 println!("Channel closed: the receiver has been deallocated");
             });

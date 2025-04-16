@@ -6,7 +6,7 @@ use crate::server::server::Server;
 use crate::server::{self, request::{ParseError, Request, RequestMethod::{GET, POST}}};
 
 pub fn handle_request(
-    stream: TcpStream,
+    stream: &TcpStream,
     server: Arc<Server>,
 ) -> String {
     let Request {method, uri, body, headers} = match server::request::parse(&stream) {
