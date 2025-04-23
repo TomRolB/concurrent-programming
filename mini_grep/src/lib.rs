@@ -16,13 +16,15 @@ pub fn grep_seq(pattern: String, file_names: Vec<String>) -> Vec<String> {
 }
 
 pub fn grep_conc(pattern: String, file_names: Vec<String>) -> Vec<String> {
-    let threads = file_names.into_iter().map(|file| {
-        let pattern_clone = pattern.clone();
-        thread::spawn(|| filter_lines_from_file(file, pattern_clone).collect::<Vec<_>>())
-    });
+    let threads: Vec<JoinHandle<Vec<String>>> = file_names.into_iter()
+        .map(|file| {
+            let pattern_clone = pattern.clone();
+            thread::spawn(|| filter_lines_from_file(file, pattern_clone).collect::<Vec<_>>())
+        })
+        .collect();
 
     threads
-        .map(|t| t.join().unwrap())
+        .into_iter().map(|t| t.join().unwrap())
         .flatten()
         .collect::<Vec<_>>()
 }
