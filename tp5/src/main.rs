@@ -46,9 +46,10 @@ struct NonBlockingQueue<T> {
 
 impl<T> NonBlockingQueue<T> {
     fn new() -> NonBlockingQueue<T> {
+        let dummy_node: *mut Node<T> = Box::into_raw(Box::new(Node::dummy()));
         NonBlockingQueue {
-            head: AtomicPtr::new(Box::into_raw(Box::new(Node::dummy()))),
-            tail: AtomicPtr::new(Box::into_raw(Box::new(Node::dummy()))),
+            head: AtomicPtr::new(dummy_node),
+            tail: AtomicPtr::new(dummy_node),
         }
     }
 
@@ -56,7 +57,7 @@ impl<T> NonBlockingQueue<T> {
         let new_node: *mut Node<T> = Box::into_raw(Box::new(Node::new(item)));
         loop {
             let cur_tail: *mut Node<T> = self.tail.load(Ordering::Relaxed);
-            let tail_next: *mut Node<T> = unsafe { (**(&cur_tail)).next.load(Ordering::Relaxed) };
+            let tail_next: *mut Node<T> = unsafe { (*cur_tail).next.load(Ordering::Relaxed) };
 
             if cur_tail == self.tail.load(Ordering::Relaxed) {
                 if !tail_next.is_null() {
@@ -86,13 +87,14 @@ impl<T> NonBlockingQueue<T> {
     
     fn dequeue(&self) -> Option<T> {
         let mut old_head = Box::new(self.head.load(Ordering::Relaxed));
-        unsafe {
-            while !old_head.is_null() && !self.head.compare_exchange(*old_head, (**old_head).next.load(Ordering::Relaxed), Ordering::Relaxed, Ordering::Relaxed).is_ok() {
-                old_head = Box::new(self.head.load(Ordering::Relaxed));
-            }
-        }
         if old_head.is_null() {
             return None;
+        }
+        unsafe {
+            while !old_head.is_null() && !self.head.compare_exchange(*old_head, (**old_head).next.load(Ordering::Relaxed), Ordering::Relaxed, Ordering::Relaxed).is_ok() || 
+            (**old_head).item.is_none() && !(**old_head).next.load(Ordering::Relaxed).is_null() {
+                old_head = Box::new(self.head.load(Ordering::Relaxed));
+            }
         }
         unsafe { (**old_head).item.take() }
     }
@@ -106,14 +108,13 @@ mod tests {
     fn it_works() {
         let queue: NonBlockingQueue<u32> = NonBlockingQueue::new();
 
-        for _ in 1..10 {
-            queue.enqueue(1);
+        for i in 1..10 {
+            queue.enqueue(i);
         }
-        println!("JIJO");
-        // (1..10).for_each(|_| {
-        //     let item = queue.dequeue();
-        //     assert!(item.is_some());
-        // });
+        (1..10).for_each(|_| {
+            let item = queue.dequeue();
+            assert!(item.is_some());
+        });
         
     }
 }
