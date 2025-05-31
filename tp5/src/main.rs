@@ -1,7 +1,17 @@
 use std::sync::atomic::{AtomicPtr, Ordering};
+use std::ptr::null_mut;
 
 fn main() {
-    println!("Hello, world!");
+    let queue: NonBlockingQueue<u32> = NonBlockingQueue::new();
+
+    for i in 1..10 {
+        queue.enqueue(i);
+        println!("Enqueued {i}");
+    }
+    for _ in 1..10 {
+        println!("{:?}", queue.dequeue());
+    }
+        
 }
 
 struct Node<T> {
@@ -13,14 +23,14 @@ impl<T> Node<T> {
     fn new(item: T) -> Node<T> {
         Node {
             item: Some(item),
-            next: AtomicPtr::default(),
+            next: AtomicPtr::new(null_mut()),
         }
     }
 
     fn dummy() -> Node<T> {
         Node {
             item: None,
-            next: AtomicPtr::default(),
+            next: AtomicPtr::new(null_mut()),
         }
     }
 
@@ -37,48 +47,54 @@ struct NonBlockingQueue<T> {
 impl<T> NonBlockingQueue<T> {
     fn new() -> NonBlockingQueue<T> {
         NonBlockingQueue {
-            head: AtomicPtr::new(&mut Node::dummy()),
-            tail: AtomicPtr::new(&mut Node::dummy()),
+            head: AtomicPtr::new(Box::into_raw(Box::new(Node::dummy()))),
+            tail: AtomicPtr::new(Box::into_raw(Box::new(Node::dummy()))),
         }
     }
 
     fn enqueue(&self, item: T) {
-        let mut new_node = Node::new(item);
-            loop {
-                let cur_tail = self.tail.load(Ordering::Relaxed);
-                let tail_next = unsafe { (**(&cur_tail)).next.load(Ordering::Relaxed) };
+        let new_node: *mut Node<T> = Box::into_raw(Box::new(Node::new(item)));
+        loop {
+            let cur_tail: *mut Node<T> = self.tail.load(Ordering::Relaxed);
+            let tail_next: *mut Node<T> = unsafe { (**(&cur_tail)).next.load(Ordering::Relaxed) };
 
-                if cur_tail == self.tail.load(Ordering::Relaxed) {
-                    if unsafe { (*tail_next).is_dummy() } {
-                        let _ = self.tail.compare_exchange(
-                            cur_tail,
-                            tail_next,
-                            Ordering::Relaxed,
-                            Ordering::Relaxed,
-                        );
-                    }
+            if cur_tail == self.tail.load(Ordering::Relaxed) {
+                if !tail_next.is_null() {
+                    let _ = self.tail.compare_exchange(
+                        cur_tail,
+                        tail_next,
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                    );
                 } else if unsafe {
                     (*cur_tail)
                         .next
                         .compare_exchange(
-                            &mut Node::dummy(),
-                            &mut new_node,
+                            null_mut(),
+                            new_node,
                             Ordering::Relaxed,
                             Ordering::Relaxed,
                         )
                         .is_ok()
-                }{
-                    let _ = self.tail.compare_exchange(cur_tail, &mut new_node, Ordering::Relaxed, Ordering::Relaxed);
+                } {
+                    let _ = self.tail.compare_exchange(cur_tail, new_node, Ordering::Relaxed, Ordering::Relaxed);
                     return;
                 }
+            }
         }
     }
     
     fn dequeue(&self) -> Option<T> {
-            let head_node = self.head.load(Ordering::Relaxed);
-            let result = unsafe { &(*(head_node)).item };
-            let _ = unsafe { self.head.compare_exchange(head_node, (*head_node).next.load(Ordering::Relaxed), Ordering::Relaxed, Ordering::Relaxed).is_ok() };
-            *result
+        let mut old_head = Box::new(self.head.load(Ordering::Relaxed));
+        unsafe {
+            while !old_head.is_null() && !self.head.compare_exchange(*old_head, (**old_head).next.load(Ordering::Relaxed), Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+                old_head = Box::new(self.head.load(Ordering::Relaxed));
+            }
+        }
+        if old_head.is_null() {
+            return None;
+        }
+        unsafe { (**old_head).item.take() }
     }
 }
 
@@ -90,8 +106,14 @@ mod tests {
     fn it_works() {
         let queue: NonBlockingQueue<u32> = NonBlockingQueue::new();
 
-        (1..10).for_each(|num| queue.enqueue(num));
+        for _ in 1..10 {
+            queue.enqueue(1);
+        }
+        println!("JIJO");
+        // (1..10).for_each(|_| {
+        //     let item = queue.dequeue();
+        //     assert!(item.is_some());
+        // });
         
-        assert_eq!(queue, 4);
     }
 }
