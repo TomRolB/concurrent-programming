@@ -27,6 +27,7 @@ pub struct NonBlockingQueue<T> {
     tail: AtomicPtr<Node<T>>,
 }
 
+
 impl<T> NonBlockingQueue<T> {
     pub fn new() -> NonBlockingQueue<T> {
         let dummy_node: *mut Node<T> = Box::into_raw(Box::new(Node::dummy()));
@@ -78,8 +79,10 @@ impl<T> NonBlockingQueue<T> {
             (**old_head).item.is_none() && !(**old_head).next.load(Ordering::Relaxed).is_null() {
                 old_head = Box::new(self.head.load(Ordering::Relaxed));
             }
+            let item = (**old_head).item.take();
+            drop(Box::from_raw(*old_head));
+            item
         }
-        unsafe { (**old_head).item.take() }
     }
 }
 

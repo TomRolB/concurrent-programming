@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::{Condvar, Mutex};
 
 pub struct BlockingQueue<T> {
-    queue: Mutex<VecDeque<T>>,
+    queue: Mutex<VecDeque<Option<T>>>,
     condvar: Condvar,
 }
 
@@ -16,11 +16,11 @@ impl<T> BlockingQueue<T> {
 
     pub fn enqueue(&self, item: T) {
         let mut queue = self.queue.lock().unwrap();
-        queue.push_back(item);
+        queue.push_back(Some(item));
         self.condvar.notify_one();
     }
 
-    pub fn dequeue(&self) -> T {
+    pub fn dequeue(&self) -> Option<T> {
         let mut queue = self.queue.lock().unwrap();
         while queue.is_empty() {
             queue = self.condvar.wait(queue).unwrap();
