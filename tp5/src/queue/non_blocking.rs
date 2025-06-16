@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicPtr, Ordering};
 use std::ptr::null_mut;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 struct Node<T> {
     item: Option<T>,
@@ -27,6 +27,9 @@ pub struct NonBlockingQueue<T> {
     tail: AtomicPtr<Node<T>>,
 }
 
+const RELAXED: Ordering = Ordering::Relaxed;
+const ACQUIRE: Ordering = Ordering::Acquire;
+const RELEASE: Ordering = Ordering::Release;
 
 impl<T> NonBlockingQueue<T> {
     pub fn new() -> NonBlockingQueue<T> {
@@ -40,16 +43,16 @@ impl<T> NonBlockingQueue<T> {
     pub fn enqueue(&self, item: T) {
         let new_node: *mut Node<T> = Box::into_raw(Box::new(Node::new(item)));
         loop {
-            let cur_tail: *mut Node<T> = self.tail.load(Ordering::Relaxed);
-            let tail_next: *mut Node<T> = unsafe { (*cur_tail).next.load(Ordering::Relaxed) };
+            let cur_tail: *mut Node<T> = self.tail.load(RELAXED);
+            let tail_next: *mut Node<T> = unsafe { (*cur_tail).next.load(RELAXED) };
 
-            if cur_tail == self.tail.load(Ordering::Relaxed) {
+            if cur_tail == self.tail.load(RELAXED) {
                 if !tail_next.is_null() {
                     let _ = self.tail.compare_exchange(
                         cur_tail,
                         tail_next,
-                        Ordering::Relaxed,
-                        Ordering::Relaxed,
+                        ACQUIRE,
+                        RELAXED,
                     );
                 } else if unsafe {
                     (*cur_tail)
@@ -57,31 +60,42 @@ impl<T> NonBlockingQueue<T> {
                         .compare_exchange(
                             null_mut(),
                             new_node,
-                            Ordering::Relaxed,
-                            Ordering::Relaxed,
+                            RELEASE,
+                            RELAXED,
                         )
                         .is_ok()
                 } {
-                    let _ = self.tail.compare_exchange(cur_tail, new_node, Ordering::Relaxed, Ordering::Relaxed);
+                    let _ = self.tail.compare_exchange(
+                        cur_tail,
+                        new_node,
+                        RELAXED, // Previous RELEASE already provides CAS
+                        RELAXED,
+                    );
                     return;
                 }
             }
         }
     }
-    
+
     pub fn dequeue(&self) -> Option<T> {
-        let mut old_head = Box::new(self.head.load(Ordering::Relaxed));
-        if old_head.is_null() {
-            return None;
-        }
-        unsafe {
-            while !old_head.is_null() && !self.head.compare_exchange(*old_head, (**old_head).next.load(Ordering::Relaxed), Ordering::Relaxed, Ordering::Relaxed).is_ok() || 
-            (**old_head).item.is_none() && !(**old_head).next.load(Ordering::Relaxed).is_null() {
-                old_head = Box::new(self.head.load(Ordering::Relaxed));
+        loop {
+            let head = self.head.load(ACQUIRE);
+            let tail = self.tail.load(ACQUIRE);
+            let next = unsafe { (*head).next.load(ACQUIRE) };
+            if head == tail {
+                if next.is_null() {
+                    return None;
+                }
+                let _ = self.tail.compare_exchange(tail, next, RELEASE, ACQUIRE);
+            } else {
+                if next.is_null() {
+                    continue;
+                }
+                if self.head.compare_exchange(head, next, RELEASE, ACQUIRE).is_ok() {
+                    let item_option = unsafe { (*next).item.take() };
+                    return item_option;
+                }
             }
-            let item = (**old_head).item.take();
-            drop(Box::from_raw(*old_head));
-            item
         }
     }
 }
@@ -101,7 +115,7 @@ mod tests {
             let item = queue.dequeue();
             assert!(item.is_some());
         });
-        
+
         assert!(queue.dequeue().is_none());
     }
 }
