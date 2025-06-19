@@ -2,14 +2,13 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-const N_THREADS: u8 = 8;
 type SyncReceiverArc = Arc<Mutex<Receiver<Box<dyn Send + FnOnce()>>>>;
 
-pub fn create_pool_and_get_sender() -> Sender<Box<dyn Send + FnOnce()>> {
+pub fn create_pool_and_get_sender(thread_amount: u8) -> Sender<Box<dyn Send + FnOnce()>> {
     let (tx, rx) = channel::<Box<dyn Send + FnOnce()>>();
     let rx_arc = Arc::new(Mutex::new(rx));
 
-    for _ in 0..N_THREADS {
+    for _ in 0.. thread_amount{
         let arc_clone = rx_arc.clone();
         thread::spawn(|| {
             check_and_run_tasks(arc_clone);
