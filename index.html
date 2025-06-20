@@ -271,16 +271,8 @@ en los tiempos de ejecución? ¿A qué se debe esto?</strong></p>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="18" data-paginate="true" data-theme="default" lang="C" data-marpit-pagination="18" style="--paginate:true;--theme:default;" data-marpit-pagination-total="22">
 <h1 id="tp7-threads-vs-async">TP7: Threads vs Async</h1>
 <p><strong>Problema</strong>: Comparar modelo de threads tradicionales vs async/await con Tokio para I/O y cálculo.</p>
-<h2 id="simulaci%C3%B3n-io-tp7srcmainrs">Simulación I/O (<code>tp7/src/main.rs</code>):</h2>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-rust"><span class="hljs-keyword">fn</span> <span class="hljs-title function_">simulate_io_threads</span>(tasks: <span class="hljs-type">usize</span>) {
-    thread::<span class="hljs-title function_ invoke__">scope</span>(|s| {
-        <span class="hljs-keyword">for</span> <span class="hljs-variable">_</span> <span class="hljs-keyword">in</span> <span class="hljs-number">0</span>..tasks {
-            s.<span class="hljs-title function_ invoke__">spawn</span>(|| thread::<span class="hljs-title function_ invoke__">sleep</span>(Duration::<span class="hljs-title function_ invoke__">from_millis</span>(<span class="hljs-number">100</span>)));
-        }
-    });
-}
-
-<span class="hljs-keyword">async</span> <span class="hljs-keyword">fn</span> <span class="hljs-title function_">simulate_io_async</span>(tasks: <span class="hljs-type">usize</span>) {
+<h3 id="simulaci%C3%B3n-io-tp7srcmainrs">Simulación I/O (<code>tp7/src/main.rs</code>):</h3>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-rust"><span class="hljs-keyword">async</span> <span class="hljs-keyword">fn</span> <span class="hljs-title function_">simulate_io_async</span>(tasks: <span class="hljs-type">usize</span>) {
     <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut </span><span class="hljs-variable">handles</span> = <span class="hljs-type">Vec</span>::<span class="hljs-title function_ invoke__">new</span>();
     <span class="hljs-keyword">for</span> <span class="hljs-variable">_</span> <span class="hljs-keyword">in</span> <span class="hljs-number">0</span>..tasks {
         handles.<span class="hljs-title function_ invoke__">push</span>(tokio::<span class="hljs-title function_ invoke__">spawn</span>(<span class="hljs-keyword">async</span> {
@@ -295,18 +287,8 @@ en los tiempos de ejecución? ¿A qué se debe esto?</strong></p>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="19" data-paginate="true" data-theme="default" lang="C" data-marpit-pagination="19" style="--paginate:true;--theme:default;" data-marpit-pagination-total="22">
 <h1 id="tp7-c%C3%A1lculo-de-pi">TP7: Cálculo de Pi</h1>
-<h2 id="leibniz-series-tp7srcmainrs">Leibniz Series (<code>tp7/src/main.rs</code>):</h2>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-rust"><span class="hljs-keyword">fn</span> <span class="hljs-title function_">liebniz_threads</span>(terms: <span class="hljs-type">usize</span>) <span class="hljs-punctuation">-&gt;</span> <span class="hljs-type">f64</span> {
-    <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut </span><span class="hljs-variable">handles</span> = <span class="hljs-type">Vec</span>::<span class="hljs-title function_ invoke__">new</span>();
-    <span class="hljs-keyword">let</span> <span class="hljs-variable">chunk_size</span> = <span class="hljs-number">1000</span>;
-    <span class="hljs-keyword">for</span> <span class="hljs-variable">start</span> <span class="hljs-keyword">in</span> (<span class="hljs-number">0</span>..terms).<span class="hljs-title function_ invoke__">step_by</span>(chunk_size) {
-        <span class="hljs-keyword">let</span> <span class="hljs-variable">count</span> = <span class="hljs-keyword">if</span> start + chunk_size &gt; terms { terms - start } <span class="hljs-keyword">else</span> { chunk_size };
-        handles.<span class="hljs-title function_ invoke__">push</span>(thread::<span class="hljs-title function_ invoke__">spawn</span>(<span class="hljs-keyword">move</span> || <span class="hljs-title function_ invoke__">liebniz_pi_partial</span>(start, count)));
-    }
-    handles.<span class="hljs-title function_ invoke__">into_iter</span>().<span class="hljs-title function_ invoke__">map</span>(|h| h.<span class="hljs-title function_ invoke__">join</span>().<span class="hljs-title function_ invoke__">unwrap</span>()).<span class="hljs-title function_ invoke__">sum</span>()
-}
-
-<span class="hljs-keyword">async</span> <span class="hljs-keyword">fn</span> <span class="hljs-title function_">liebniz_async</span>(terms: <span class="hljs-type">usize</span>) <span class="hljs-punctuation">-&gt;</span> <span class="hljs-type">f64</span> {
+<h3 id="serie-de-leibniz-tp7srcmainrs">Serie de Leibniz (<code>tp7/src/main.rs</code>):</h3>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-rust"><span class="hljs-keyword">async</span> <span class="hljs-keyword">fn</span> <span class="hljs-title function_">liebniz_async</span>(terms: <span class="hljs-type">usize</span>) <span class="hljs-punctuation">-&gt;</span> <span class="hljs-type">f64</span> {
     <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut </span><span class="hljs-variable">handles</span> = <span class="hljs-type">Vec</span>::<span class="hljs-title function_ invoke__">new</span>();
     <span class="hljs-keyword">let</span> <span class="hljs-variable">chunk_size</span> = <span class="hljs-number">1000</span>;
     <span class="hljs-keyword">for</span> <span class="hljs-variable">start</span> <span class="hljs-keyword">in</span> (<span class="hljs-number">0</span>..terms).<span class="hljs-title function_ invoke__">step_by</span>(chunk_size) {
@@ -321,7 +303,7 @@ en los tiempos de ejecución? ¿A qué se debe esto?</strong></p>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="20" data-paginate="true" data-theme="default" lang="C" data-marpit-pagination="20" style="--paginate:true;--theme:default;" data-marpit-pagination-total="22">
 <h1 id="tp7-resultados">TP7: Resultados</h1>
-<h2 id="resultados-de-operaciones-io">Resultados de operaciones I/O</h2>
+<h2 id="resultados-de-simulaci%C3%B3n-io">Resultados de simulación I/O</h2>
 <table>
 <thead>
 <tr>
