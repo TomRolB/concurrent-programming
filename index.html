@@ -185,7 +185,7 @@ en los tiempos de ejecución? ¿A qué se debe esto?</strong></p>
 <p><strong>Problema</strong>: Implementar FIFO con múltiples productores/consumidores: versión bloqueante vs no bloqueante.</p>
 <p><strong>Solución</strong>:</p>
 <ul>
-<li><strong>Bloqueante:</strong> Utilizar <code>Mutex&lt;VecDeque&gt;</code> + <code>Condvar</code>.</li>
+<li><strong>Bloqueante:</strong> Utilizar <code>Mutex</code> + <code>Condvar</code>.</li>
 <li><strong>No bloqueante:</strong> Lista con <code>AtomicPtr</code> y CAS.</li>
 </ul>
 <p>Como la novedad en este TP son los algoritmos no bloqueantes, mostraremos principalmente esa implementación. A su vez, en este caso sí será importante ver todo el código para entender el funcionamiento.</p>
