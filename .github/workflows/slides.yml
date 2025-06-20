@@ -1,0 +1,26 @@
+name: Build and Deploy Slides
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      - name: Install Marp CLI
+        run: npm install -g @marp-team/marp-cli
+      - name: Generate slides HTML
+        run: mkdir -p docs && marp presentation.md -o docs/index.html
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          publish_dir: docs
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }} 
