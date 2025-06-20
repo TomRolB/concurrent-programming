@@ -6,8 +6,8 @@ paginate: true
 ---
 # Programación Concurrente 2025
 ## Presentación de trabajos prácticos
-### Docentes: Emilio López Gabeiras, Rodrigo Pazos
-### Grupo: Francisco Zizzi, Tomás Roldán Borjas
+Docentes: Emilio López Gabeiras, Rodrigo Pazos
+Grupo: Francisco Zizzi, Tomás Roldán Borjas
 
 ---
 # Objetivo
@@ -28,7 +28,7 @@ for stream in listener.incoming() {
     stream.write_all(response.as_bytes()).unwrap();
 }
 ```
-- `compute_pi(n)`: suma `(−1)^k/(2k+1)` de `k=0..n` y multiplica por 4.
+- `handle_request` llama a  `compute_pi(n)`, que aplica la serie de Leibniz.
 
 ---
 # TP1: Preguntas y Respuestas
@@ -36,7 +36,7 @@ for stream in listener.incoming() {
 - El segundo espera a que termine el primero; el servidor bloquea.
 
 **¿Por qué ocurre?**
-- No hay concurrencia: el bucle procesa peticiones secuencialmente.
+- No hay concurrencia: estamos manejando un solo thread, por lo cual las requests se atienden secuencialmente.
 
 **¿Cómo solucionarlo solo con `std`?**
 - Usar `std::thread::spawn` para cada conexión (ver TP2).
@@ -48,28 +48,27 @@ for stream in listener.incoming() {
 **Solución** (`tp2/src/main.rs`):
 ```rust
 for stream in listener.incoming() {
-    thread::spawn(|| {
-        let mut s = stream.unwrap();
-        s.write_all(handle_request(&mut s).as_bytes()).unwrap();
-    });
-}
+        thread::spawn(|| {
+            let mut stream = stream.unwrap();
+            let result = handle_request(&mut stream);
+            stream.write_all(result.as_bytes()).unwrap();
+        });
+    }
 ```
-- Cada petición en un hilo independiente.
+- Cada petición se maneja en un hilo independiente.
 
 ---
 # TP2: Preguntas y Respuestas
-**¿Qué efectos al usar `ab -n 500 -c 50`?**
-- Throughput crece hasta saturar CPU, latencia aumenta con más hilos.
-
-**¿Se nota diferencia en tiempos?**
-- Sí: overhead de creación y scheduling de hilos impacta tiempo medio.
+**¿Qué efectos se observan al aumentar `-n` y `-c` usando Apache Benchmark? ¿Se nota diferencia en tiempos?**
+- Al principio, aumenta la velocidad promedio del tratamiento de cada request.
+- Al aumentar la cantidad de requests concurrentes mucho más allá de la cantidad de cores, la velocidad vuelve a disminuir.
 
 **¿A qué se debe?**
-- Coste de `thread::spawn` y gestión del scheduler de sistema.
+- Existe una sobrecarga de hilos, por lo cual se dan muchos context switches y la concurrencia ni siquiera se aprovecha.
 
 ---
 # TP3: Thread Pool
-**Problema**: Reducir overhead de spawn en TP2 usando un pool de hilos.
+**Problema**: Reducir overhead de context switches en TP2 usando un pool de hilos.
 
 **Solución** (`tp3/src/server/pooling.rs`):
 ```rust
@@ -83,22 +82,23 @@ for stream in listener.incoming() {
         });
     }
 ```
-- Pool fijo de N hilos, tareas via canal `mpsc`.
+- Pool fijo de N hilos, enviándoles las tareas mediante `mpsc`.
 
 ---
 # TP3: Preguntas y Respuestas
-**¿Mejora respecto a TP2?**
-- Reduce latencia y overhead al reusar hilos en lugar de crear nuevos.
+**Bajo carga concurrente intensa, ¿se observa una mejora respecto al TP2?**
+- Sí. Se reduce latencia y overhead al reusar hilos en lugar de crear nuevos.
 
 **¿Cómo afecta tamaño del pool?**
-- Pool pequeño se satura, pool muy grande vuelve similar a TP2 por overhead.
+- Para un pool de N_THREADS ≈ # Cores del CPU, maneja una gran carga de concurrencia mejor que el TP2.
+- Para un número mucho mayor, se vuelve al mismo problema.
 
 ---
 # TP4: LogAnalyzer – Escritura
 **Problema**: Servidor HTTP que reciba archivos de log, cuente "exception" y provea estadísticas, garantizando la mayor eficiencia de escritura y lectura, y limitando las subidas de archivos simultáneas a 4 como máximo.
 
 **Solución**
-Se utiliza un Read-Write Lock para las estadísticas, pudiendo bloquear al escribir y leer sin bloqueos, y un semáforo para limitar 
+Se utiliza un Read-Write Lock para las estadísticas, pudiendo bloquear al escribir y leer sin bloqueos, y un semáforo para limitar la cantidad de subidas
 
 ---
 
@@ -125,12 +125,54 @@ Se utiliza un Read-Write Lock para las estadísticas, pudiendo bloquear al escri
 ```
 
 ---
-# TP4: Preguntas y Respuestas
-**¿Qué pasa si suben >4 archivos a la vez?**
-- Respuesta HTTP 429 Too Many Requests.
+# TP MiniGrep
+**Problema**: Buscar un patrón en varios archivos en tres modos: secuencial, hilo por archivo y hilo por chunk.
 
-**¿Cómo se maneja el acceso concurrente?**
-- Lecturas simultáneas con `RwLock.read()`, escrituras secuenciales con `RwLock.write()`.
+**Solución secuencial** (`mini_grep/src/lib.rs`):
+```rust
+pub fn grep_seq(pattern: String, file_names: Vec<String>) -> Vec<String> {
+    file_names
+        .into_iter()
+        .map(|file_name| filter_lines_from_file(file_name, pattern.clone()))
+        .flatten()
+        .collect::<Vec<_>>()
+}
+```
+
+---
+
+**Solución concurrente**:
+```rust
+    let threads: Vec<JoinHandle<Vec<String>>> = file_names.into_iter()
+        .map(|file| { // Creamos un thread por archivo, para paralelizar
+            let pattern_clone = pattern.clone();
+            thread::spawn(|| filter_lines_from_file(file, pattern_clone).collect::<Vec<_>>())
+        })
+        .collect();
+```
+**Solución por chunks**:
+```rust
+    let mut br = BufReader::new(File::open(file_name).unwrap()).lines();
+    // Esta es la parte clave del código. Se van incluyendo líneas hasta llenar un chunk:
+    loop {
+        let chunk: Vec<String> = br.by_ref().take(chunk_size).map(|line| line.unwrap()).collect::<Vec<_>>();
+
+        if chunk.is_empty() {
+            break;
+        };
+
+        add_new_chunk_thread(chunk, &mut chunk_threads, pattern.clone());
+    }
+```
+
+---
+# TP MiniGrep: Preguntas y Respuestas
+**¿Tiempo secuencial vs concurrente?**
+- La solución concurrente tarda aproximadamente la mitad
+
+**Al reducir el tamano de los segmentos (chunks), ¿qué patrón se observa
+en los tiempos de ejecución? ¿A qué se debe esto?**
+- Los tiempos de ejecución van aumentando. A veces llega a tardar más que la solución concurrente. Esto se debe a un exceso de threads y context switches.
 
 ---
 # TP5: Colas Concurrentes
@@ -138,7 +180,7 @@ Se utiliza un Read-Write Lock para las estadísticas, pudiendo bloquear al escri
 
 **Solución**:
 - **Bloqueante:** Utilizar `Mutex<VecDeque>` + `Condvar`.
-- **No bloqueante:** Lista con `AtomicPtr` y CAS).
+- **No bloqueante:** Lista con `AtomicPtr` y CAS.
 
 Como la novedad en este TP son los algoritmos no bloqueantes, mostraremos principalmente esa implementación. A su vez, en este caso sí será importante ver todo el código para entender el funcionamiento.
 
@@ -211,62 +253,16 @@ pub fn dequeue(&self) -> Option<T> {
 ---
 # TP5: Preguntas y Respuestas
 **¿Diferencias de rendimiento?**
-- Bloqueante: latencias mayores bajo alta contención.
-- No bloqueante: mejor throughput con contención moderada.
+- El bloqueante es mejor para mayor cantidad de hilos, y el no bloqueante para pocos hilos (livelock para muchos).
 
-**¿Dificultades versión no bloqueante?**
-- Orden de memoria, punteros atómicos, evitar ABA.
+**¿Dificultades técnicas al implementar la versión no bloqueante?**
+- Tuvimos que arreglar un problema de violación de acceso a memoria.
 
----
-# TP MiniGrep
-**Problema**: Buscar un patrón en varios archivos en tres modos: secuencial, hilo por archivo y hilo por chunk.
+**¿Bajo qué escenarios conviene usar cada una?**
+- Usar non-blocking con baja contención, y blocking bajo alta contención.
 
-**Solución secuencial** (`mini_grep/src/lib.rs`):
-```rust
-pub fn grep_seq(pattern: String, file_names: Vec<String>) -> Vec<String> {
-    file_names
-        .into_iter()
-        .map(|file_name| filter_lines_from_file(file_name, pattern.clone()))
-        .flatten()
-        .collect::<Vec<_>>()
-}
-```
-
----
-
-**Solución concurrente**:
-```rust
-    let threads: Vec<JoinHandle<Vec<String>>> = file_names.into_iter()
-        .map(|file| { // Creamos un thread por archivo, para paralelizar
-            let pattern_clone = pattern.clone();
-            thread::spawn(|| filter_lines_from_file(file, pattern_clone).collect::<Vec<_>>())
-        })
-        .collect();
-```
-**Solución por chunks**:
-```rust
-    let mut br = BufReader::new(File::open(file_name).unwrap()).lines();
-    // Esta es la parte clave del código. Se van incluyendo líneas hasta llenar un chunk:
-    loop {
-        let chunk: Vec<String> = br.by_ref().take(chunk_size).map(|line| line.unwrap()).collect::<Vec<_>>();
-
-        if chunk.is_empty() {
-            break;
-        };
-
-        add_new_chunk_thread(chunk, &mut chunk_threads, pattern.clone());
-    }
-```
-
----
-# TP MiniGrep: Preguntas y Respuestas
-**¿Tiempo secuencial vs concurrente?**
-- La solución concurrente tarda aproximadamente la mitad
-
-**¿Qué ocurre al variar tamaño de chunks?**
-- Chunks medios: Tarda casi la mitad que la solución concurrente.
-- Chunks grandes: Tiempos parecidos a la solución concurrente.
-- Chunks pequeños: Exceso de threads y context switches. A veces llega a tardar más que la solución concurrente.
+**¿Si se mezclan bloqueante con no bloqueante?**
+- Sería positivo si la alta contención está del lado del bloqueante, y viceversa.
 
 ---
 # TP7: Threads vs Async
