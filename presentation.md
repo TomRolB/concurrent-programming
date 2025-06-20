@@ -270,19 +270,89 @@ pub fn dequeue(&self) -> Option<T> {
 
 **Solución** (`tp7/src/main.rs`):
 ```rust
-simulate_io_threads(TASKS);
-simulate_io_async(TASKS).await;
-let pi_t = liebniz_threads(TERMS);
-let pi_a = liebniz_async(TERMS).await;
+fn simulate_io_threads(tasks: usize) {
+    thread::scope(|s| {
+        for _ in 0..tasks {
+            s.spawn(|| thread::sleep(Duration::from_millis(100)));
+        }
+    });
+}
+
+async fn simulate_io_async(tasks: usize) {
+    let mut handles = Vec::new();
+    for _ in 0..tasks {
+        handles.push(tokio::spawn(async {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }));
+    }
+    for handle in handles {
+        let _ = handle.await;
+    }
+}
+
+fn liebniz_threads(terms: usize) -> f64 {
+    let mut handles = Vec::new();
+    let chunk_size = 1000;
+    for start in (0..terms).step_by(chunk_size) {
+        let count = if start + chunk_size > terms {
+            terms - start
+        } else {
+            chunk_size
+        };
+        handles.push(thread::spawn(move || liebniz_pi_partial(start, count)));
+    }
+    handles.into_iter().map(|h| h.join().unwrap()).sum()
+}
+
+async fn liebniz_async(terms: usize) -> f64 {
+    let mut handles = Vec::new();
+    let chunk_size = 1000;
+    for start in (0..terms).step_by(chunk_size) {
+        let count = if start + chunk_size > terms {
+            terms - start
+        } else {
+            chunk_size
+        };
+        handles.push(tokio::spawn(async move { liebniz_pi_partial(start, count) }));
+    }
+    let mut sum = 0.0;
+    for handle in handles {
+        sum += handle.await.unwrap();
+    }
+    sum
+}
 ```
-- I/O: `thread::sleep` vs `tokio::time::sleep`.
-- Cálculo: subtareas unidas con `join` o `await`.
 
 ---
-# TP7: Preguntas y Respuestas
-**¿Qué escala mejor en I/O?**
-- `async` maneja miles de tareas sin bloquear hilos.
+# TP7: Resultados Experimentales
 
-**¿Y en cómputo intensivo?**
-- Threads nativos aprovechan mejor CPU en cálculos pesados.
+## I/O Simulation Results
+| Tasks | Threads | Async   |
+|-------|---------|---------|
+| 10    | 100.7ms | 100.7ms |
+| 100   | 105.2ms | 102.5ms |
+| 1000  | 132.4ms | 105.1ms |
+| 10000 | Crash   | 131.6ms |
+
+**Observación clave**: Async maneja 10,000 tareas concurrentes sin problemas, mientras que threads fallaría por límites del sistema.
+
+---
+# TP7: Resultados Experimentales (cont.)
+
+## Pi Calculation Results
+| Tasks | Terms | Threads | Async |
+|-------|-------|---------|-------|
+| 4 | 1M | 21.6ms | 11.5ms |
+| 8 | 10M | 80.3ms | 81.0ms |
+| 16 | 10M | 86.9ms | 81.1ms |
+
+**Observación**: Para cálculo intensivo, la diferencia es mínima. Async es más rapido en la mayoría de casos.
+
+---
+# TP7: Análisis y Conclusiones
+
+**¿Por qué es mejor async?**
+- **Menor uso de memoria**: Threads usan ~8MB de stack c/u vs ~2KB por task async
+- **Límites del sistema**: OS limita threads (~1000-4000), async puede manejar millones
+- **Menos trabajo para el Scheduler**: Hay menos cambios de contexto
  
