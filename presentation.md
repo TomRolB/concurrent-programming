@@ -268,7 +268,7 @@ pub fn dequeue(&self) -> Option<T> {
 # TP7: Threads vs Async
 **Problema**: Comparar modelo de threads tradicionales vs async/await con Tokio para I/O y cálculo.
 
-**Solución** (`tp7/src/main.rs`):
+## Simulación I/O (`tp7/src/main.rs`):
 ```rust
 fn simulate_io_threads(tasks: usize) {
     thread::scope(|s| {
@@ -289,16 +289,19 @@ async fn simulate_io_async(tasks: usize) {
         let _ = handle.await;
     }
 }
+```
 
+---
+
+# TP7: Cálculo de Pi
+
+## Leibniz Series (`tp7/src/main.rs`):
+```rust
 fn liebniz_threads(terms: usize) -> f64 {
     let mut handles = Vec::new();
     let chunk_size = 1000;
     for start in (0..terms).step_by(chunk_size) {
-        let count = if start + chunk_size > terms {
-            terms - start
-        } else {
-            chunk_size
-        };
+        let count = if start + chunk_size > terms { terms - start } else { chunk_size };
         handles.push(thread::spawn(move || liebniz_pi_partial(start, count)));
     }
     handles.into_iter().map(|h| h.join().unwrap()).sum()
@@ -308,25 +311,20 @@ async fn liebniz_async(terms: usize) -> f64 {
     let mut handles = Vec::new();
     let chunk_size = 1000;
     for start in (0..terms).step_by(chunk_size) {
-        let count = if start + chunk_size > terms {
-            terms - start
-        } else {
-            chunk_size
-        };
+        let count = if start + chunk_size > terms { terms - start } else { chunk_size };
         handles.push(tokio::spawn(async move { liebniz_pi_partial(start, count) }));
     }
     let mut sum = 0.0;
-    for handle in handles {
-        sum += handle.await.unwrap();
-    }
+    for handle in handles { sum += handle.await.unwrap(); }
     sum
 }
 ```
 
 ---
-# TP7: Resultados Experimentales
 
-## I/O Simulation Results
+# TP7: Resultados
+
+## Resultados de operaciones I/O
 | Tasks | Threads | Async   |
 |-------|---------|---------|
 | 10    | 100.7ms | 100.7ms |
@@ -334,13 +332,13 @@ async fn liebniz_async(terms: usize) -> f64 {
 | 1000  | 132.4ms | 105.1ms |
 | 10000 | Crash   | 131.6ms |
 
-**Observación clave**: Async maneja 10,000 tareas concurrentes sin problemas, mientras que threads fallaría por límites del sistema.
+**Observación**: Async maneja 10,000 tareas concurrentes sin problemas, mientras que threads fallaría por límites del sistema.
 
 ---
-# TP7: Resultados Experimentales (cont.)
+# TP7: Resultados
 
-## Pi Calculation Results
-| Tasks | Terms | Threads | Async |
+## Resultados del calculo de PI
+| Tasks | Terminos | Threads | Async |
 |-------|-------|---------|-------|
 | 4 | 1M | 21.6ms | 11.5ms |
 | 8 | 10M | 80.3ms | 81.0ms |
