@@ -268,16 +268,8 @@ pub fn dequeue(&self) -> Option<T> {
 # TP7: Threads vs Async
 **Problema**: Comparar modelo de threads tradicionales vs async/await con Tokio para I/O y cálculo.
 
-## Simulación I/O (`tp7/src/main.rs`):
+### Simulación I/O (`tp7/src/main.rs`):
 ```rust
-fn simulate_io_threads(tasks: usize) {
-    thread::scope(|s| {
-        for _ in 0..tasks {
-            s.spawn(|| thread::sleep(Duration::from_millis(100)));
-        }
-    });
-}
-
 async fn simulate_io_async(tasks: usize) {
     let mut handles = Vec::new();
     for _ in 0..tasks {
@@ -295,18 +287,8 @@ async fn simulate_io_async(tasks: usize) {
 
 # TP7: Cálculo de Pi
 
-## Leibniz Series (`tp7/src/main.rs`):
+### Serie de Leibniz (`tp7/src/main.rs`):
 ```rust
-fn liebniz_threads(terms: usize) -> f64 {
-    let mut handles = Vec::new();
-    let chunk_size = 1000;
-    for start in (0..terms).step_by(chunk_size) {
-        let count = if start + chunk_size > terms { terms - start } else { chunk_size };
-        handles.push(thread::spawn(move || liebniz_pi_partial(start, count)));
-    }
-    handles.into_iter().map(|h| h.join().unwrap()).sum()
-}
-
 async fn liebniz_async(terms: usize) -> f64 {
     let mut handles = Vec::new();
     let chunk_size = 1000;
@@ -324,7 +306,7 @@ async fn liebniz_async(terms: usize) -> f64 {
 
 # TP7: Resultados
 
-## Resultados de operaciones I/O
+## Resultados de simulación I/O
 | Tasks | Threads | Async   |
 |-------|---------|---------|
 | 10    | 100.7ms | 100.7ms |
